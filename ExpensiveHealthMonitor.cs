@@ -6,12 +6,11 @@ public class ExpensiveHealthMonitor : IHealthCheck, IHostedService, IDisposable
 {
     private Timer _timer;
     public bool Healthy { get; private set; } = true;
-    private ILogger<ExpensiveHealthMonitor> _logger;
     private IHttpClientFactory _httpClientFactory;
-    public ExpensiveHealthMonitor(IHttpClientFactory httpClientFactory, ILogger<ExpensiveHealthMonitor> logger)
+    
+    public ExpensiveHealthMonitor(IHttpClientFactory httpClientFactory)
     {
         _httpClientFactory = httpClientFactory;
-        _logger = logger;
     }
 
     public Task StartAsync(CancellationToken cancellationToken)
@@ -22,17 +21,22 @@ public class ExpensiveHealthMonitor : IHealthCheck, IHostedService, IDisposable
 
     private async void CheckDependencies(object state)
     {
+        var watch = System.Diagnostics.Stopwatch.StartNew();
         // Heavy checks go here (async calls, etc.)
-        Healthy = await ProbeDependencies();
+        // We could have as many as we want here to ultimately determine health
+        Healthy = await ProbeSlowPokeApi();
+        watch.Stop();
+        Console.WriteLine($"{DateTime.Now.ToLongTimeString()} - Ran PokeApiHealthCheck in the background. Took {watch.ElapsedMilliseconds} ms.");
     }
     
-    private async Task<bool> ProbeDependencies()
+    private async Task<bool> ProbeSlowPokeApi()
     {
-        _logger.LogDebug("Running PokeApiHealthCheck in the background...");
-        Console.WriteLine("Running PokeApiHealthCheck in the background...");
-        var httpClient = _httpClientFactory.CreateClient(); 
+        var httpClient = _httpClientFactory.CreateClient();
+        
+        // Simulate some delay in the request
+        await Task.Delay(700);
+        
         var response = await httpClient.GetAsync($"https://pokeapi.co/api/v2/pokemon");
-
         return response.IsSuccessStatusCode;
     }
 
@@ -49,7 +53,7 @@ public class ExpensiveHealthMonitor : IHealthCheck, IHostedService, IDisposable
 
     public Task<HealthCheckResult> CheckHealthAsync(HealthCheckContext context, CancellationToken cancellationToken = new CancellationToken())
     {
-        _logger.LogDebug("Health check endpoint called");
+        Console.WriteLine($"{DateTime.Now.ToLongTimeString()} - Health Endpoint called!");
         return Task.FromResult(Healthy ? HealthCheckResult.Healthy("Healthy") : HealthCheckResult.Unhealthy("Unhealthy"));
     }
 }
