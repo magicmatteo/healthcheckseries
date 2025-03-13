@@ -9,15 +9,21 @@ public class Program
     public static void Main(string[] args)
     {
         var builder = WebApplication.CreateBuilder(args);
-        builder.Logging.AddConsole();
-        
-        builder.Services.AddHostedService<ExpensiveHealthMonitor>();
+
+        builder.Services.AddSingleton<ExpensiveHealthMonitor>();
+        builder.Services.AddHostedService(p => p.GetRequiredService<ExpensiveHealthMonitor>());
 
         builder.Services.AddHealthChecks()
-            .AddCheck<CustomHealthCheck>("PokeApi", failureStatus: HealthStatus.Unhealthy, tags: new[] { "services" })
+            .AddCheck<CustomHealthCheck>("PokeApi")
             .AddCheck<ExpensiveHealthMonitor>("ExpensiveHealthCheck");
-            //.AddSqlServer("Server=localhost;Database=master;User Id=sa;Password=SuperStr0ngP@ssw0rd;TrustServerCertificate=True;", "SELECT 1")
-            //.AddRedis("localhost:6379");
+
+        if (builder.Configuration.GetValue<bool>("Redis-Sql-HealthCheck-Enabled"))
+        {
+            builder.Services.AddHealthChecks()
+                .AddSqlServer("Server=localhost;Database=master;User Id=sa;Password=SuperStr0ngP@ssw0rd;TrustServerCertificate=True;", "SELECT 1")
+                .AddRedis("localhost:6379");
+        }
+        
         
         builder.Services.AddHttpClient();
         

@@ -3,17 +3,11 @@ using System.Diagnostics;
 
 namespace HealthCheck;
 
-public class ExpensiveHealthMonitor : IHealthCheck, IHostedService, IDisposable
+public class ExpensiveHealthMonitor(IHttpClientFactory httpClientFactory) : IHealthCheck, IHostedService, IDisposable
 {
     private Timer _timer;
     private long _checkMs;
     public bool Healthy { get; private set; } = true;
-    private IHttpClientFactory _httpClientFactory;
-    
-    public ExpensiveHealthMonitor(IHttpClientFactory httpClientFactory)
-    {
-        _httpClientFactory = httpClientFactory;
-    }
 
     public Task StartAsync(CancellationToken cancellationToken)
     {
@@ -32,10 +26,12 @@ public class ExpensiveHealthMonitor : IHealthCheck, IHostedService, IDisposable
         _timer?.Dispose();
     }
 
-    public Task<HealthCheckResult> CheckHealthAsync(HealthCheckContext context, CancellationToken cancellationToken = new CancellationToken())
+    public Task<HealthCheckResult> CheckHealthAsync(HealthCheckContext context, CancellationToken cancellationToken = new())
     {
         Console.WriteLine($"{DateTime.Now.ToLongTimeString()} - Health Endpoint called!");
-        return Task.FromResult(Healthy ? HealthCheckResult.Healthy($"ExpensiveDependency is Healthy - last check took {_checkMs}ms.") : HealthCheckResult.Unhealthy("ExpensiveDependency is Unhealthy"));
+        return Task.FromResult(Healthy
+            ? HealthCheckResult.Healthy($"ExpensiveDependency is Healthy - last check took {_checkMs}ms.")
+            : HealthCheckResult.Unhealthy("ExpensiveDependency is Unhealthy"));
     }
     
     private async void CheckDependencies(object state)
@@ -46,12 +42,13 @@ public class ExpensiveHealthMonitor : IHealthCheck, IHostedService, IDisposable
         Healthy = await ProbeSlowPokeApi();
         watch.Stop();
         _checkMs = watch.ElapsedMilliseconds;
-        Console.WriteLine($"{DateTime.Now.ToLongTimeString()} - Ran PokeApiHealthCheck in the background. Took {_checkMs} ms.");
+        Console.WriteLine($"{DateTime.Now.ToLongTimeString()} - Ran PokeApiHealthCheck in the background. " + 
+                          $"Took {_checkMs} ms.");
     }
     
     private async Task<bool> ProbeSlowPokeApi()
     {
-        var httpClient = _httpClientFactory.CreateClient();
+        var httpClient = httpClientFactory.CreateClient();
         
         // Simulate some delay in the request
         await Task.Delay(700);
